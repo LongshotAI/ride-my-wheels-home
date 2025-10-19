@@ -11,7 +11,7 @@ import RideChat from "@/components/RideChat";
 import RatingModal from "@/components/RatingModal";
 import SOSModal from "@/components/SOSModal";
 import { useRealtimeRide } from "@/hooks/useRealtimeRide";
-import { geocodeAddress } from "@/lib/googleMaps";
+import { geocodeAddress, getCurrentLocation } from "@/lib/googleMaps";
 
 const RiderDashboard = () => {
   const navigate = useNavigate();
@@ -20,6 +20,7 @@ const RiderDashboard = () => {
   const [pickup, setPickup] = useState({ address: "", lat: undefined as number | undefined, lng: undefined as number | undefined });
   const [dropoff, setDropoff] = useState({ address: "", lat: undefined as number | undefined, lng: undefined as number | undefined });
   const [activeRide, setActiveRide] = useState<any>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [showSOS, setShowSOS] = useState(false);
@@ -29,7 +30,19 @@ const RiderDashboard = () => {
 
   useEffect(() => {
     checkAuth();
+    getCurrentUserLocation();
   }, []);
+
+  const getCurrentUserLocation = async () => {
+    try {
+      const location = await getCurrentLocation();
+      setCurrentLocation(location);
+      console.log('Rider current location:', location);
+    } catch (error) {
+      console.error("Error getting current location:", error);
+      toast.error("Unable to get your location. Please enable location services.");
+    }
+  };
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -181,6 +194,11 @@ const RiderDashboard = () => {
                 pickup={activeRide?.pickup || (pickup.lat && pickup.lng ? pickup : undefined)}
                 dropoff={activeRide?.dropoff || (dropoff.lat && dropoff.lng ? dropoff : undefined)}
                 driverLocation={driverLocation || undefined}
+                currentLocation={currentLocation || undefined}
+                showRoute={!!(
+                  (pickup.lat && pickup.lng && dropoff.lat && dropoff.lng) ||
+                  (activeRide?.pickup && activeRide?.dropoff)
+                )}
               />
             </Card>
 

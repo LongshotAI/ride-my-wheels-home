@@ -280,6 +280,9 @@ const DriverDashboard = () => {
                 pickup={activeRide?.pickup}
                 dropoff={activeRide?.dropoff}
                 driverLocation={currentLocation || undefined}
+                currentLocation={currentLocation || undefined}
+                showRoute={!!(activeRide && currentLocation && activeRide.pickup)}
+                showMultipleRoutes={!!(activeRide && activeRide.status === "driver_assigned")}
               />
             </Card>
 
