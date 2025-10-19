@@ -103,7 +103,7 @@ const RideMap = (props: RideMapProps) => {
   }
 
   return (
-    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
       <Map
         defaultCenter={mapCenter}
         defaultZoom={props.zoom || 13}

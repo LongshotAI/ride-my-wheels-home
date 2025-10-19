@@ -18,7 +18,8 @@ let googleMapsLoaded = false;
 let googleMapsLoadingPromise: Promise<void> | null = null;
 
 const loadGoogleMaps = (): Promise<void> => {
-  if (googleMapsLoaded) {
+  // Check if places library is already loaded
+  if (googleMapsLoaded && window.google?.maps?.places) {
     return Promise.resolve();
   }
 
@@ -27,19 +28,53 @@ const loadGoogleMaps = (): Promise<void> => {
   }
 
   googleMapsLoadingPromise = new Promise((resolve, reject) => {
+    // If google maps is already loaded (by RideMap), just wait for places
     if (window.google?.maps) {
-      googleMapsLoaded = true;
-      resolve();
+      // Check if places library is available
+      const checkPlaces = () => {
+        if (window.google?.maps?.places) {
+          googleMapsLoaded = true;
+          resolve();
+        } else {
+          // If places not available, load it
+          const script = document.createElement("script");
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            // Wait a bit for places to initialize
+            setTimeout(() => {
+              if (window.google?.maps?.places) {
+                googleMapsLoaded = true;
+                resolve();
+              } else {
+                reject(new Error("Places library failed to load"));
+              }
+            }, 100);
+          };
+          script.onerror = () => reject(new Error("Failed to load Google Maps Places"));
+          document.head.appendChild(script);
+        }
+      };
+      checkPlaces();
       return;
     }
 
+    // Google Maps not loaded at all, load it with places
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      googleMapsLoaded = true;
-      resolve();
+      // Wait a bit for places to initialize
+      setTimeout(() => {
+        if (window.google?.maps?.places) {
+          googleMapsLoaded = true;
+          resolve();
+        } else {
+          reject(new Error("Places library failed to initialize"));
+        }
+      }, 100);
     };
     script.onerror = () => reject(new Error("Failed to load Google Maps"));
     document.head.appendChild(script);
@@ -64,6 +99,12 @@ const AddressAutocomplete = ({
     loadGoogleMaps()
       .then(() => {
         if (!inputRef.current) return;
+
+        // Double-check places is available
+        if (!window.google?.maps?.places) {
+          console.error("Google Maps Places library not available");
+          return;
+        }
 
         const autocompleteInstance = new google.maps.places.Autocomplete(inputRef.current, {
           types: ["address"],
