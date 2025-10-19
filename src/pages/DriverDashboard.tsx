@@ -66,7 +66,17 @@ const DriverDashboard = () => {
       .eq("id", session.user.id)
       .single();
 
-    if (userData?.role !== "driver") {
+    // Check if user has super_admin role (god mode access)
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id);
+
+    const roles = userRoles?.map(r => r.role) || [];
+    const isSuperAdmin = roles.includes("super_admin" as any);
+
+    // Super admins can access everything, otherwise check role
+    if (!isSuperAdmin && userData?.role !== "driver") {
       navigate(`/${userData?.role || "auth"}`);
       return;
     }
