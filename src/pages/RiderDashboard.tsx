@@ -3,18 +3,29 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { MapPin, Clock, DollarSign, User, LogOut, Navigation, MessageSquare, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, DollarSign, User, LogOut, Navigation, MessageSquare, AlertTriangle, Star } from "lucide-react";
+import RideMap from "@/components/RideMap";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
+import RideChat from "@/components/RideChat";
+import RatingModal from "@/components/RatingModal";
+import SOSModal from "@/components/SOSModal";
+import { useRealtimeRide } from "@/hooks/useRealtimeRide";
+import { geocodeAddress } from "@/lib/googleMaps";
 
 const RiderDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [pickup, setPickup] = useState("");
-  const [dropoff, setDropoff] = useState("");
+  const [pickup, setPickup] = useState({ address: "", lat: 0, lng: 0 });
+  const [dropoff, setDropoff] = useState({ address: "", lat: 0, lng: 0 });
   const [activeRide, setActiveRide] = useState<any>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [showSOS, setShowSOS] = useState(false);
+  const [booking, setBooking] = useState(false);
+  
+  const { rideEvents, messages, driverLocation } = useRealtimeRide(activeRide?.id);
 
   useEffect(() => {
     checkAuth();
@@ -67,38 +78,33 @@ const RiderDashboard = () => {
 
   const handleBookRide = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pickup || !dropoff) {
+    if (!pickup.address || !dropoff.address) {
       toast.error("Please enter both pickup and dropoff locations");
       return;
     }
 
-    // Mock pricing calculation
-    const quotedPrice = 500 + Math.floor(Math.random() * 2000);
+    if (!pickup.lat || !dropoff.lat) {
+      toast.error("Please select addresses from the dropdown");
+      return;
+    }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: ride, error } = await supabase
-        .from("rides")
-        .insert({
-          rider_id: session.user.id,
-          pickup: { address: pickup },
-          dropoff: { address: dropoff },
-          quoted_price_cents: quotedPrice,
-          status: "requested",
-        })
-        .select()
-        .single();
+      setBooking(true);
+      
+      const { data, error } = await supabase.functions.invoke("rides-request", {
+        body: { pickup, dropoff }
+      });
 
       if (error) throw error;
 
       toast.success("Ride requested! Finding a driver...");
-      setActiveRide(ride);
-      setPickup("");
-      setDropoff("");
+      setActiveRide(data.ride);
+      setPickup({ address: "", lat: 0, lng: 0 });
+      setDropoff({ address: "", lat: 0, lng: 0 });
     } catch (error: any) {
       toast.error(error.message || "Failed to book ride");
+    } finally {
+      setBooking(false);
     }
   };
 
@@ -106,19 +112,26 @@ const RiderDashboard = () => {
     if (!activeRide) return;
 
     try {
-      const { error } = await supabase
-        .from("rides")
-        .update({ status: "cancelled_by_rider" })
-        .eq("id", activeRide.id);
+      const { error } = await supabase.functions.invoke("rides-cancel", {
+        body: { ride_id: activeRide.id }
+      });
 
       if (error) throw error;
 
       toast.success("Ride cancelled");
       setActiveRide(null);
+      setShowChat(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to cancel ride");
     }
   };
+
+  useEffect(() => {
+    // Show rating modal when ride is completed
+    if (activeRide?.status === "completed" && !showRating) {
+      setShowRating(true);
+    }
+  }, [activeRide?.status]);
 
   if (loading) {
     return (
@@ -152,20 +165,18 @@ const RiderDashboard = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Map Area */}
-          <div className="lg:col-span-2">
-            <Card className="p-6 h-[600px] relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-success/5 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <MapPin className="w-16 h-16 mx-auto text-muted-foreground animate-pulse" />
-                  <p className="text-muted-foreground">
-                    Google Maps integration will appear here
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Real-time driver tracking & route display
-                  </p>
-                </div>
-              </div>
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="p-0 h-[600px] overflow-hidden">
+              <RideMap
+                pickup={activeRide?.pickup || pickup}
+                dropoff={activeRide?.dropoff || dropoff}
+                driverLocation={driverLocation || undefined}
+              />
             </Card>
+
+            {showChat && activeRide && (
+              <RideChat rideId={activeRide.id} messages={messages} />
+            )}
           </div>
 
           {/* Booking Panel */}
@@ -174,33 +185,25 @@ const RiderDashboard = () => {
               <Card className="p-6 shadow-card">
                 <h2 className="text-2xl font-bold mb-6">Book a DeeDee</h2>
                 <form onSubmit={handleBookRide} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pickup">Pickup Location</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="pickup"
-                        placeholder="Current location"
-                        value={pickup}
-                        onChange={(e) => setPickup(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
+                  <AddressAutocomplete
+                    label="Pickup Location"
+                    placeholder="Current location"
+                    value={pickup.address}
+                    onChange={(address, lat, lng) => 
+                      setPickup({ address, lat: lat || 0, lng: lng || 0 })
+                    }
+                    icon={<MapPin className="w-4 h-4" />}
+                  />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="dropoff">Dropoff Location</Label>
-                    <div className="relative">
-                      <Navigation className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="dropoff"
-                        placeholder="Where to?"
-                        value={dropoff}
-                        onChange={(e) => setDropoff(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
+                  <AddressAutocomplete
+                    label="Dropoff Location"
+                    placeholder="Where to?"
+                    value={dropoff.address}
+                    onChange={(address, lat, lng) => 
+                      setDropoff({ address, lat: lat || 0, lng: lng || 0 })
+                    }
+                    icon={<Navigation className="w-4 h-4" />}
+                  />
 
                   <div className="pt-4 space-y-3">
                     <div className="flex items-center justify-between text-sm">
@@ -213,8 +216,13 @@ const RiderDashboard = () => {
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full mt-6" size="lg">
-                    Request DeeDee
+                  <Button 
+                    type="submit" 
+                    className="w-full mt-6" 
+                    size="lg"
+                    disabled={booking || !pickup.lat || !dropoff.lat}
+                  >
+                    {booking ? "Requesting..." : "Request DeeDee"}
                   </Button>
                 </form>
               </Card>
@@ -262,21 +270,41 @@ const RiderDashboard = () => {
                   )}
 
                   <div className="pt-4 space-y-2">
-                    <Button variant="outline" className="w-full">
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Message Driver
-                    </Button>
-                    <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                      <AlertTriangle className="w-4 h-4 mr-2" />
-                      SOS
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      className="w-full text-muted-foreground"
-                      onClick={handleCancelRide}
-                    >
-                      Cancel Ride
-                    </Button>
+                    {activeRide.status === "completed" ? (
+                      <Button 
+                        className="w-full bg-success hover:bg-success/90"
+                        onClick={() => setShowRating(true)}
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        Rate Driver
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => setShowChat(!showChat)}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          {showChat ? "Hide Chat" : "Message Driver"}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={() => setShowSOS(true)}
+                        >
+                          <AlertTriangle className="w-4 h-4 mr-2" />
+                          SOS Emergency
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full text-muted-foreground"
+                          onClick={handleCancelRide}
+                        >
+                          Cancel Ride
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -306,6 +334,28 @@ const RiderDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {activeRide && showRating && (
+        <RatingModal
+          open={showRating}
+          onClose={() => {
+            setShowRating(false);
+            setActiveRide(null);
+          }}
+          rideId={activeRide.id}
+          driverId={activeRide.driver_id}
+          driverName={activeRide.driver?.full_name || "Your driver"}
+        />
+      )}
+
+      {activeRide && (
+        <SOSModal
+          open={showSOS}
+          onClose={() => setShowSOS(false)}
+          rideId={activeRide.id}
+        />
+      )}
     </div>
   );
 };

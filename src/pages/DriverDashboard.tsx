@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { User, LogOut, MapPin, Navigation, DollarSign, Star, Clock, Bike, CheckCircle2 } from "lucide-react";
+import { User, LogOut, MapPin, Navigation, DollarSign, Star, Clock, Bike, CheckCircle2, MessageSquare } from "lucide-react";
+import RideMap from "@/components/RideMap";
+import RideChat from "@/components/RideChat";
+import { useRealtimeRide } from "@/hooks/useRealtimeRide";
+import { getCurrentLocation } from "@/lib/googleMaps";
 
 const DriverDashboard = () => {
   const navigate = useNavigate();
@@ -17,10 +21,37 @@ const DriverDashboard = () => {
   const [online, setOnline] = useState(false);
   const [availableRides, setAvailableRides] = useState<any[]>([]);
   const [activeRide, setActiveRide] = useState<any>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  const { messages, driverLocation } = useRealtimeRide(activeRide?.id);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Update location when online
+  useEffect(() => {
+    if (!online) return;
+
+    const updateLocation = async () => {
+      try {
+        const location = await getCurrentLocation();
+        setCurrentLocation(location);
+
+        await supabase.functions.invoke("driver-update-location", {
+          body: { lat: location.lat, lng: location.lng }
+        });
+      } catch (error) {
+        console.error("Error updating location:", error);
+      }
+    };
+
+    updateLocation();
+    const interval = setInterval(updateLocation, 10000); // Update every 10s
+
+    return () => clearInterval(interval);
+  }, [online, activeRide?.id]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -114,22 +145,15 @@ const DriverDashboard = () => {
   };
 
   const handleAcceptRide = async (rideId: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
     try {
-      const { error } = await supabase
-        .from("rides")
-        .update({ 
-          driver_id: session.user.id,
-          status: "driver_assigned" 
-        })
-        .eq("id", rideId);
+      const { data, error } = await supabase.functions.invoke("rides-accept", {
+        body: { ride_id: rideId }
+      });
 
       if (error) throw error;
 
       toast.success("Ride accepted! Navigate to pickup location");
-      loadActiveRide();
+      setActiveRide(data.ride);
       loadAvailableRides();
     } catch (error: any) {
       toast.error(error.message || "Failed to accept ride");
@@ -240,20 +264,18 @@ const DriverDashboard = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Map Area */}
-          <div className="lg:col-span-2">
-            <Card className="p-6 h-[600px] relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-success/5 flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <MapPin className="w-16 h-16 mx-auto text-muted-foreground animate-pulse" />
-                  <p className="text-muted-foreground">
-                    Google Maps integration will appear here
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Navigation to pickup & dropoff locations
-                  </p>
-                </div>
-              </div>
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="p-0 h-[600px] overflow-hidden">
+              <RideMap
+                pickup={activeRide?.pickup}
+                dropoff={activeRide?.dropoff}
+                driverLocation={currentLocation || undefined}
+              />
             </Card>
+
+            {showChat && activeRide && (
+              <RideChat rideId={activeRide.id} messages={messages} />
+            )}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-4 gap-4 mt-6">
@@ -324,6 +346,15 @@ const DriverDashboard = () => {
                   </div>
 
                   <div className="pt-4 space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => setShowChat(!showChat)}
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      {showChat ? "Hide Chat" : "Message Rider"}
+                    </Button>
+
                     {activeRide.status === "driver_assigned" && (
                       <Button 
                         className="w-full"
