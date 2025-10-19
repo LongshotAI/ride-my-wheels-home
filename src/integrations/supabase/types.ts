@@ -2240,7 +2240,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "rider" | "driver" | "admin"
+      app_role: "rider" | "driver" | "admin" | "super_admin"
       background_check_status: "not_started" | "pending" | "clear" | "failed"
       driver_status: "pending" | "approved" | "rejected" | "suspended"
       ride_event_type:
@@ -2396,7 +2396,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["rider", "driver", "admin"],
+      app_role: ["rider", "driver", "admin", "super_admin"],
       background_check_status: ["not_started", "pending", "clear", "failed"],
       driver_status: ["pending", "approved", "rejected", "suspended"],
       ride_event_type: [
