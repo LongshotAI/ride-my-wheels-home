@@ -28,56 +28,25 @@ const loadGoogleMaps = (): Promise<void> => {
   }
 
   googleMapsLoadingPromise = new Promise((resolve, reject) => {
-    // If google maps is already loaded (by RideMap), just wait for places
-    if (window.google?.maps) {
-      // Check if places library is available
-      const checkPlaces = () => {
-        if (window.google?.maps?.places) {
-          googleMapsLoaded = true;
-          resolve();
-        } else {
-          // If places not available, load it
-          const script = document.createElement("script");
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            // Wait a bit for places to initialize
-            setTimeout(() => {
-              if (window.google?.maps?.places) {
-                googleMapsLoaded = true;
-                resolve();
-              } else {
-                reject(new Error("Places library failed to load"));
-              }
-            }, 100);
-          };
-          script.onerror = () => reject(new Error("Failed to load Google Maps Places"));
-          document.head.appendChild(script);
-        }
-      };
-      checkPlaces();
-      return;
-    }
+    // Wait for Google Maps to be loaded by RideMap's APIProvider
+    const checkInterval = setInterval(() => {
+      if (window.google?.maps?.places) {
+        clearInterval(checkInterval);
+        googleMapsLoaded = true;
+        resolve();
+      }
+    }, 100);
 
-    // Google Maps not loaded at all, load it with places
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      // Wait a bit for places to initialize
-      setTimeout(() => {
-        if (window.google?.maps?.places) {
-          googleMapsLoaded = true;
-          resolve();
-        } else {
-          reject(new Error("Places library failed to initialize"));
-        }
-      }, 100);
-    };
-    script.onerror = () => reject(new Error("Failed to load Google Maps"));
-    document.head.appendChild(script);
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      if (window.google?.maps?.places) {
+        googleMapsLoaded = true;
+        resolve();
+      } else {
+        reject(new Error("Google Maps Places library failed to load"));
+      }
+    }, 10000);
   });
 
   return googleMapsLoadingPromise;

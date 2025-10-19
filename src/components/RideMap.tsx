@@ -191,23 +191,16 @@ const MapContent = ({
 };
 
 const RideMap = (props: RideMapProps) => {
-  // Determine the best center point
+  // Determine the best center point - ALWAYS have a valid center
   const getInitialCenter = (): LatLng => {
     if (props.center) return props.center;
-    if (props.pickup) return props.pickup;
+    if (props.currentLocation) return props.currentLocation;
     if (props.driverLocation) return props.driverLocation;
+    if (props.pickup) return props.pickup;
     return DEFAULT_CENTER;
   };
 
-  const [mapCenter, setMapCenter] = useState<LatLng>(getInitialCenter());
-
-  useEffect(() => {
-    if (props.driverLocation) {
-      setMapCenter(props.driverLocation);
-    } else if (props.pickup) {
-      setMapCenter(props.pickup);
-    }
-  }, [props.driverLocation, props.pickup]);
+  const [mapCenter] = useState<LatLng>(getInitialCenter());
 
   if (!GOOGLE_MAPS_API_KEY) {
     return (
@@ -226,7 +219,9 @@ const RideMap = (props: RideMapProps) => {
     center: mapCenter, 
     pickup: props.pickup, 
     dropoff: props.dropoff,
-    hasDriver: !!props.driverLocation 
+    currentLocation: props.currentLocation,
+    hasDriver: !!props.driverLocation,
+    showRoute: props.showRoute
   });
 
   return (
