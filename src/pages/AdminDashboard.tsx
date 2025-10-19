@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { User, LogOut, CheckCircle2, XCircle, Users, Car, DollarSign, TrendingUp } from "lucide-react";
+import { User, LogOut, CheckCircle2, XCircle, Users, Car, DollarSign, TrendingUp, Settings, Shield } from "lucide-react";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -87,6 +87,10 @@ const AdminDashboard = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold bg-gradient-accent bg-clip-text text-transparent">DeeDee Admin</h1>
           <div className="flex items-center gap-4">
+            <Button variant="outline" size="sm" onClick={() => navigate("/admin/users")}>
+              <Shield className="w-4 h-4 mr-2" />
+              User Management
+            </Button>
             <span className="font-medium">{user?.full_name}</span>
             <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut().then(() => navigate("/"))}>
               <LogOut className="w-4 h-4 mr-2" />Sign Out
