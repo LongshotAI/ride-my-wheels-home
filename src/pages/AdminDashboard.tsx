@@ -30,7 +30,17 @@ const AdminDashboard = () => {
       .eq("id", session.user.id)
       .single();
 
-    if (userData?.role !== "admin") {
+    // Check if user has super_admin or admin role
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id);
+
+    const roles = userRoles?.map(r => r.role) || [];
+    const isSuperAdmin = roles.includes("super_admin" as any);
+    const isAdmin = roles.includes("admin");
+
+    if (!isSuperAdmin && !isAdmin) {
       navigate(`/${userData?.role || "auth"}`);
       return;
     }

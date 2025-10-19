@@ -29,14 +29,26 @@ const Auth = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const { data: userData } = await supabase
-          .from("users")
+        // Check user_roles table for admin/super_admin
+        const { data: userRoles } = await supabase
+          .from("user_roles")
           .select("role")
-          .eq("id", session.user.id)
-          .single();
+          .eq("user_id", session.user.id);
+
+        const roles = userRoles?.map(r => r.role) || [];
         
-        if (userData) {
-          navigate(`/${userData.role}`);
+        if (roles.includes("super_admin" as any) || roles.includes("admin")) {
+          navigate("/admin");
+        } else {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", session.user.id)
+            .single();
+          
+          if (userData) {
+            navigate(`/${userData.role}`);
+          }
         }
       }
     };
@@ -87,15 +99,28 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        const { data: userData } = await supabase
-          .from("users")
+        // Check user_roles table for admin/super_admin
+        const { data: userRoles } = await supabase
+          .from("user_roles")
           .select("role")
-          .eq("id", data.user.id)
-          .single();
+          .eq("user_id", data.user.id);
 
+        const roles = userRoles?.map(r => r.role) || [];
+        
         toast.success("Signed in successfully!");
-        if (userData) {
-          navigate(`/${userData.role}`);
+        
+        if (roles.includes("super_admin" as any) || roles.includes("admin")) {
+          navigate("/admin");
+        } else {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", data.user.id)
+            .single();
+
+          if (userData) {
+            navigate(`/${userData.role}`);
+          }
         }
       }
     } catch (error: any) {
