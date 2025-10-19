@@ -77,9 +77,15 @@ const MapContent = ({ pickup, dropoff, driverLocation, center, zoom = 13 }: Ride
 };
 
 const RideMap = (props: RideMapProps) => {
-  const [mapCenter, setMapCenter] = useState<LatLng>(
-    props.center || props.pickup || DEFAULT_CENTER
-  );
+  // Determine the best center point
+  const getInitialCenter = (): LatLng => {
+    if (props.center) return props.center;
+    if (props.pickup) return props.pickup;
+    if (props.driverLocation) return props.driverLocation;
+    return DEFAULT_CENTER;
+  };
+
+  const [mapCenter, setMapCenter] = useState<LatLng>(getInitialCenter());
 
   useEffect(() => {
     if (props.driverLocation) {
@@ -102,11 +108,18 @@ const RideMap = (props: RideMapProps) => {
     );
   }
 
+  console.log('RideMap rendering with:', { 
+    center: mapCenter, 
+    pickup: props.pickup, 
+    dropoff: props.dropoff,
+    hasDriver: !!props.driverLocation 
+  });
+
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
       <Map
-        defaultCenter={mapCenter}
-        defaultZoom={props.zoom || 13}
+        center={mapCenter}
+        zoom={props.zoom || 13}
         gestureHandling="greedy"
         disableDefaultUI={false}
         style={{ width: "100%", height: "100%" }}
