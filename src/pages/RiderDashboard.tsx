@@ -17,8 +17,8 @@ const RiderDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [pickup, setPickup] = useState({ address: "", lat: 0, lng: 0 });
-  const [dropoff, setDropoff] = useState({ address: "", lat: 0, lng: 0 });
+  const [pickup, setPickup] = useState({ address: "", lat: undefined as number | undefined, lng: undefined as number | undefined });
+  const [dropoff, setDropoff] = useState({ address: "", lat: undefined as number | undefined, lng: undefined as number | undefined });
   const [activeRide, setActiveRide] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
   const [showRating, setShowRating] = useState(false);
@@ -109,8 +109,8 @@ const RiderDashboard = () => {
 
       toast.success("Ride requested! Finding a driver...");
       setActiveRide(data.ride);
-      setPickup({ address: "", lat: 0, lng: 0 });
-      setDropoff({ address: "", lat: 0, lng: 0 });
+      setPickup({ address: "", lat: undefined, lng: undefined });
+      setDropoff({ address: "", lat: undefined, lng: undefined });
     } catch (error: any) {
       toast.error(error.message || "Failed to book ride");
     } finally {
@@ -178,8 +178,8 @@ const RiderDashboard = () => {
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-0 h-[600px] overflow-hidden">
               <RideMap
-                pickup={activeRide?.pickup || pickup}
-                dropoff={activeRide?.dropoff || dropoff}
+                pickup={activeRide?.pickup || (pickup.lat && pickup.lng ? pickup : undefined)}
+                dropoff={activeRide?.dropoff || (dropoff.lat && dropoff.lng ? dropoff : undefined)}
                 driverLocation={driverLocation || undefined}
               />
             </Card>
@@ -200,7 +200,7 @@ const RiderDashboard = () => {
                     placeholder="Current location"
                     value={pickup.address}
                     onChange={(address, lat, lng) => 
-                      setPickup({ address, lat: lat || 0, lng: lng || 0 })
+                      setPickup({ address, lat: lat, lng: lng })
                     }
                     icon={<MapPin className="w-4 h-4" />}
                   />
@@ -210,7 +210,7 @@ const RiderDashboard = () => {
                     placeholder="Where to?"
                     value={dropoff.address}
                     onChange={(address, lat, lng) => 
-                      setDropoff({ address, lat: lat || 0, lng: lng || 0 })
+                      setDropoff({ address, lat: lat, lng: lng })
                     }
                     icon={<Navigation className="w-4 h-4" />}
                   />
